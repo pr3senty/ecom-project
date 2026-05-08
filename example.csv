@@ -1,0 +1,41 @@
+ID,Name,Surname,Patronymic,Subject,Grade
+1,Ivan,Ivanov,Ivanovich,MATH,8
+1,Ivan,Ivanov,Ivanovich,PHYSICS,7
+1,Ivan,Ivanov,Ivanovich,HISTORY,6
+1,Ivan,Ivanov,Ivanovich,SOFTWARE ENGINEERING,9
+2,Petr,Petrov,Petrovich,MATH,4
+2,Petr,Petrov,Petrovich,PHYSICS,5
+2,Petr,Petrov,Petrovich,HISTORY,7
+2,Petr,Petrov,Petrovich,SOFTWARE ENGINEERING,6
+3,Alexey,Sidorov,Sergeevich,MATH,10
+3,Alexey,Sidorov,Sergeevich,PHYSICS,9
+3,Alexey,Sidorov,Sergeevich,HISTORY,8
+3,Alexey,Sidorov,Sergeevich,SOFTWARE ENGINEERING,10
+4,Dmitry,Smirnov,Andreevich,MATH,2
+4,Dmitry,Smirnov,Andreevich,PHYSICS,3
+4,Dmitry,Smirnov,Andreevich,HISTORY,5
+4,Dmitry,Smirnov,Andreevich,SOFTWARE ENGINEERING,4
+5,Nikolay,Kuznetsov,Dmitrievich,MATH,6
+5,Nikolay,Kuznetsov,Dmitrievich,PHYSICS,6
+5,Nikolay,Kuznetsov,Dmitrievich,HISTORY,7
+5,Nikolay,Kuznetsov,Dmitrievich,SOFTWARE ENGINEERING,8
+6,Sergey,Popov,Alexandrovich,MATH,1
+6,Sergey,Popov,Alexandrovich,PHYSICS,2
+6,Sergey,Popov,Alexandrovich,HISTORY,3
+6,Sergey,Popov,Alexandrovich,SOFTWARE ENGINEERING,2
+7,Andrey,Volkov,Mikhailovich,MATH,9
+7,Andrey,Volkov,Mikhailovich,PHYSICS,8
+7,Andrey,Volkov,Mikhailovich,HISTORY,9
+7,Andrey,Volkov,Mikhailovich,SOFTWARE ENGINEERING,10
+8,Mikhail,Fedorov,Nikolaevich,MATH,0
+8,Mikhail,Fedorov,Nikolaevich,PHYSICS,1
+8,Mikhail,Fedorov,Nikolaevich,HISTORY,4
+8,Mikhail,Fedorov,Nikolaevich,SOFTWARE ENGINEERING,3
+9,Artem,Morozov,Vladimirovich,MATH,5
+9,Artem,Morozov,Vladimirovich,PHYSICS,6
+9,Artem,Morozov,Vladimirovich,HISTORY,5
+9,Artem,Morozov,Vladimirovich,SOFTWARE ENGINEERING,7
+10,Kirill,Novikov,Olegovich,MATH,7
+10,Kirill,Novikov,Olegovich,PHYSICS,8
+10,Kirill,Novikov,Olegovich,HISTORY,6
+10,Kirill,Novikov,Olegovich,SOFTWARE ENGINEERING,9
