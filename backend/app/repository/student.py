@@ -1,37 +1,45 @@
 import asyncpg
-from typing import Union
 
 from app.domain import Student
 
 
 class StudentRepository:
+    def __init__(self, conn: asyncpg.Connection):
+        self.conn = conn
 
-    @staticmethod
-    async def get_by_id(
-        conn: asyncpg.Connection,
-        id: int
-    ) -> Union[Student, None]:
-        row = await conn.fetchrow(
+    async def get_by_ids(
+        self,
+        ids: list[int],
+    ) -> dict[int, Student]:
+        if not ids:
+            return {}
+
+        rows = await self.conn.fetch(
             """
             SELECT id, name, surname, patronymic
             FROM student
-            WHERE id = $1
+            WHERE id = ANY($1::int[])
             """,
-            id
+            ids
         )
 
-        return Student(**dict(row)) if row else None
-    
-    @staticmethod
-    async def create(
-        conn: asyncpg.Connection,
-        student: Student
-    ) -> int:
-        return await conn.fetchval(
+        students = [Student(**dict(row)) for row in rows]
+        return {student.id: student for student in students}
+
+    async def create_many(
+        self,
+        students: list[Student],
+    ) -> None:
+        if not students:
+            return
+
+        await self.conn.executemany(
             """
-            INSERT INTO student(id, name, surname, patronymic) 
+            INSERT INTO student(id, name, surname, patronymic)
             VALUES ($1, $2, $3, $4)
-            RETURNING id
             """,
-            student.id, student.name, student.surname, student.patronymic
+            [
+                (student.id, student.name, student.surname, student.patronymic)
+                for student in students
+            ],
         )

@@ -1,5 +1,6 @@
-from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace
+from typing import Union
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -7,17 +8,26 @@ from app.domain import Student, Subject
 from app.service.grade import GradeService, _parse_grades_csv
 
 
-class FakeDatabase:
-    """Minimal async database fake that records transaction usage."""
+class FakeUnitOfWork:
+    """Minimal unit-of-work fake that exposes repository-like objects."""
 
-    def __init__(self):
-        self.conn = AsyncMock()
-        self.transaction_count = 0
+    def __init__(self, existing_students: Union[dict[int, Student], None] = None):
+        self.enter_count = 0
+        self.exit_count = 0
+        self.students = SimpleNamespace(
+            get_by_ids=AsyncMock(return_value=existing_students or {}),
+            create_many=AsyncMock(),
+        )
+        self.grades = SimpleNamespace(
+            create_many=AsyncMock(),
+        )
 
-    @asynccontextmanager
-    async def transaction(self):
-        self.transaction_count += 1
-        yield self.conn
+    async def __aenter__(self):
+        self.enter_count += 1
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        self.exit_count += 1
 
 
 class TestParseGradesCsv:
@@ -82,28 +92,21 @@ class TestImportGrades:
             "1,Ivan,Ivanov,,MATH,5\n"
             "1,Petr,Petrov,,MATH,4\n"
         ).encode()
-        with (
-            patch(
-                "app.service.grade.StudentRepository.get_by_id",
-                new=AsyncMock(return_value=None),
-            ),
-            patch(
-                "app.service.grade.StudentRepository.create",
-                new=AsyncMock(return_value=1),
-            ) as create_student,
-            patch(
-                "app.service.grade.GradeRepository.create",
-                new=AsyncMock(),
-            ) as create_grade,
-        ):
-            database = FakeDatabase()
-            result = await GradeService(database).import_grades(content)
+        uow = FakeUnitOfWork()
+
+        result = await GradeService(
+            uow_factory=lambda: uow,
+        ).import_grades(content)
 
         assert result.records_loaded == 1
         assert result.students == 1
-        assert database.transaction_count == 1
-        assert create_student.await_count == 1
-        assert create_grade.await_count == 1
+        assert uow.enter_count == 1
+        assert uow.exit_count == 1
+        assert uow.students.get_by_ids.await_count == 1
+        assert uow.students.create_many.await_count == 1
+        assert uow.grades.create_many.await_count == 1
+        assert len(uow.students.create_many.await_args.args[0]) == 1
+        assert len(uow.grades.create_many.await_args.args[0]) == 1
         assert len(result.errors) == 1
         assert result.errors[0].message == (
             "Student ID already exists with different full name"
@@ -117,29 +120,22 @@ class TestImportGrades:
             "1,Ivan,Ivanov,,MATH,5\n"
             "1,Ivan,Ivanov,,HISTORY,4\n"
         ).encode()
-        with (
-            patch(
-                "app.service.grade.StudentRepository.get_by_id",
-                new=AsyncMock(return_value=None),
-            ),
-            patch(
-                "app.service.grade.StudentRepository.create",
-                new=AsyncMock(return_value=1),
-            ) as create_student,
-            patch(
-                "app.service.grade.GradeRepository.create",
-                new=AsyncMock(),
-            ) as create_grade,
-        ):
-            database = FakeDatabase()
-            result = await GradeService(database).import_grades(content)
+        uow = FakeUnitOfWork()
+
+        result = await GradeService(
+            uow_factory=lambda: uow,
+        ).import_grades(content)
 
         assert result.errors == []
         assert result.records_loaded == 2
         assert result.students == 1
-        assert database.transaction_count == 1
-        assert create_student.await_count == 1
-        assert create_grade.await_count == 2
+        assert uow.enter_count == 1
+        assert uow.exit_count == 1
+        assert uow.students.get_by_ids.await_count == 1
+        assert uow.students.create_many.await_count == 1
+        assert uow.grades.create_many.await_count == 1
+        assert len(uow.students.create_many.await_args.args[0]) == 1
+        assert len(uow.grades.create_many.await_args.args[0]) == 2
 
     @pytest.mark.asyncio
     async def test_existing_id_with_different_full_name_is_skipped(self):
@@ -155,26 +151,17 @@ class TestImportGrades:
             patronymic=None,
         )
 
-        with (
-            patch(
-                "app.service.grade.StudentRepository.get_by_id",
-                new=AsyncMock(return_value=existing_student),
-            ),
-            patch(
-                "app.service.grade.StudentRepository.create",
-                new=AsyncMock(),
-            ) as create_student,
-            patch(
-                "app.service.grade.GradeRepository.create",
-                new=AsyncMock(),
-            ) as create_grade,
-        ):
-            database = FakeDatabase()
-            result = await GradeService(database).import_grades(content)
+        uow = FakeUnitOfWork(existing_students={1: existing_student})
+
+        result = await GradeService(
+            uow_factory=lambda: uow,
+        ).import_grades(content)
 
         assert result.records_loaded == 0
         assert result.students == 0
-        assert database.transaction_count == 1
-        assert create_student.await_count == 0
-        assert create_grade.await_count == 0
+        assert uow.enter_count == 1
+        assert uow.exit_count == 1
+        assert uow.students.get_by_ids.await_count == 1
+        assert uow.students.create_many.await_count == 0
+        assert uow.grades.create_many.await_count == 0
         assert len(result.errors) == 1

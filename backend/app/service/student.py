@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
 
-from app.repository.grade import GradeRepository
-
-if TYPE_CHECKING:
-    from app.core.db import Database
+from app.repository.unit_of_work import UnitOfWork
 
 
 class StudentService:
-    def __init__(self, db: Database):
-        self.db = db
+    def __init__(
+        self,
+        uow_factory: Callable[[], UnitOfWork],
+    ):
+        self.uow_factory = uow_factory
 
     async def get_more_than_3_twos(self) -> list[dict]:
-        async with self.db.connection() as conn:
-            return await GradeRepository.get_students_with_twos_count_more_than(conn, 3)
+        async with self.uow_factory() as uow:
+            return await uow.grades.get_students_with_twos_count_more_than(3)
 
     async def get_less_than_5_twos(self) -> list[dict]:
-        async with self.db.connection() as conn:
-            return await GradeRepository.get_students_with_twos_count_less_than(conn, 5)
+        async with self.uow_factory() as uow:
+            return await uow.grades.get_students_with_twos_count_less_than(5)

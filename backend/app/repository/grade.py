@@ -4,41 +4,32 @@ from app.domain import Grade
 
 
 class GradeRepository:
+    def __init__(self, conn: asyncpg.Connection):
+        self.conn = conn
 
-    @staticmethod
-    async def get_all_by_student_id(
-        conn: asyncpg.Connection,
-        student_id: int
-    ):
-        rows = await conn.fetch(
-            """
-            SELECT id, student_id, subject, value
-            FROM grade
-            WHERE student_id = $1
-            """,
-            student_id
-        )
-        return rows
-
-    @staticmethod
-    async def create(
-        conn: asyncpg.Connection,
-        grade: Grade
+    async def create_many(
+        self,
+        grades: list[Grade],
     ) -> None:
-        await conn.execute(
+        if not grades:
+            return
+
+        await self.conn.executemany(
             """
             INSERT INTO grade(id, student_id, subject, value)
             VALUES ($1, $2, $3, $4)
             """,
-            grade.id, grade.student_id, grade.subject.value, grade.value
+            [
+                (grade.id, grade.student_id, grade.subject.value, grade.value)
+                for grade in grades
+            ],
         )
 
-    @staticmethod
     async def get_students_with_twos_count_more_than(
-        conn: asyncpg.Connection,
+        self,
         count: int
     ) -> list[dict]:
-        rows = await conn.fetch(
+        rows = await self.conn.fetch(
             """
             SELECT
                 trim(concat_ws(' ', s.surname, s.name, s.patronymic)) AS full_name,
@@ -53,12 +44,11 @@ class GradeRepository:
         )
         return [dict(row) for row in rows]
 
-    @staticmethod
     async def get_students_with_twos_count_less_than(
-        conn: asyncpg.Connection,
+        self,
         count: int
     ) -> list[dict]:
-        rows = await conn.fetch(
+        rows = await self.conn.fetch(
             """
             SELECT
                 trim(concat_ws(' ', s.surname, s.name, s.patronymic)) AS full_name,

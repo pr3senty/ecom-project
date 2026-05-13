@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Union
-
-import asyncpg
+from typing import Union
 
 from app.core.csv_parser import parse_csv
 from app.domain import Grade, Student, Subject
-from app.repository.grade import GradeRepository
-from app.repository.student import StudentRepository
-
-if TYPE_CHECKING:
-    from app.core.db import Database
+from app.repository.unit_of_work import UnitOfWork
 
 
 EXPECTED_HEADERS = ("id", "name", "surname", "patronymic", "subject", "grade")
@@ -119,8 +114,11 @@ def _parse_grades_csv(content: bytes) -> tuple[list[ParsedGrade], list[GradeImpo
 
 
 class GradeService:
-    def __init__(self, db: Database):
-        self.db = db
+    def __init__(
+        self,
+        uow_factory: Callable[[], UnitOfWork],
+    ):
+        self.uow_factory = uow_factory
 
     async def import_grades(self, content: bytes) -> GradeImportResult:
         grades, errors = _parse_grades_csv(content)
@@ -132,28 +130,27 @@ class GradeService:
                 errors=errors,
             )
 
-        async with self.db.transaction() as conn:
-            return await self._import_parsed_grades(conn, grades, errors)
+        async with self.uow_factory() as uow:
+            return await self._import_parsed_grades(uow, grades, errors)
 
     async def _import_parsed_grades(
         self,
-        conn: asyncpg.Connection,
+        uow: UnitOfWork,
         grades: list[ParsedGrade],
         errors: list[GradeImportError],
     ) -> GradeImportResult:
-        loaded_records = 0
+        student_ids = sorted({parsed_grade.student.id for parsed_grade in grades})
+        known_students = await uow.students.get_by_ids(student_ids)
+        new_students: dict[int, Student] = {}
+        grades_to_create: list[Grade] = []
         loaded_student_ids: set[int] = set()
-        known_students: dict[int, Student] = {}
 
         for parsed_grade in grades:
             student = parsed_grade.student
-            known_student = known_students.get(student.id)
+            known_student = known_students.get(student.id) or new_students.get(student.id)
             if known_student is None:
-                known_student = await StudentRepository.get_by_id(conn, student.id)
-                if known_student is None:
-                    await StudentRepository.create(conn, student)
-                    known_student = student
-                known_students[student.id] = known_student
+                new_students[student.id] = student
+                known_student = student
 
             if not known_student.has_same_full_name(student):
                 errors.append(
@@ -164,8 +161,7 @@ class GradeService:
                 )
                 continue
 
-            await GradeRepository.create(
-                conn,
+            grades_to_create.append(
                 Grade(
                     id=uuid.uuid4(),
                     student_id=student.id,
@@ -173,12 +169,16 @@ class GradeService:
                     value=parsed_grade.value,
                 ),
             )
-            loaded_records += 1
             loaded_student_ids.add(student.id)
+
+        if new_students:
+            await uow.students.create_many(list(new_students.values()))
+        if grades_to_create:
+            await uow.grades.create_many(grades_to_create)
 
         return GradeImportResult(
             status="ok",
-            records_loaded=loaded_records,
+            records_loaded=len(grades_to_create),
             students=len(loaded_student_ids),
             errors=errors,
         )
